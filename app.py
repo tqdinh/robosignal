@@ -33,9 +33,9 @@ def default_error_handler(e):
 
 
 if __name__ == "__main__":
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ssl_context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
 
+    # ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    # ssl_context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
     socketio.run(
         app,
         host="0.0.0.0",
