@@ -32,13 +32,22 @@ def default_error_handler(e):
     socketio.stop()
 
 
+@app.route("/")
+def home():
+    return "Hello, Flask with Gunicorn!"
+
+
+def startapp(environ, start_response):
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=5005,
+        # ssl_context=ssl_context,
+    )
+
+
 if __name__ == "__main__":
 
     # ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     # ssl_context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
-    socketio.run(
-        app,
-        host="0.0.0.0",
-        port=5004,
-        # ssl_context=ssl_context,
-    )
+    startapp()
