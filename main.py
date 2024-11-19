@@ -1,7 +1,7 @@
 import ssl
-from flask import Flask, request
+from flask import Flask, request, render_template
 from flask_socketio import SocketIO, emit, join_room
-
+import json
 
 app = Flask(__name__)
 app.secret_key = "random secret key!"
@@ -33,8 +33,8 @@ def default_error_handler(e):
 
 
 @app.route("/")
-def home():
-    return "Hello, Flask with Gunicorn!"
+def index():
+    return render_template("index.html")
 
 
 def startapp():

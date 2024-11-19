@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video and Command Stream</title>
+    <script src="https://cdn.socket.io/4.8.0/socket.io.min.js"
+        integrity="sha384-OoIbkvzsFFQAG88r+IqMAjyOtYDPGO0cqK5HF5Uosdy/zUEGySeAzytENMDynREd"
+        crossorigin="anonymous"></script>
+    <style>
+        video {
+            width: 300px;
+            height: 300px;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>WebRTC Video and Command Stream</h1>
+
+    <!-- Video Streams -->
+    <div>
+        <h3 id="myroom">Local Video</h3>
+        <video id="localVideo" autoplay playsinline muted></video>
+        <h3>Remote Video</h3>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <!-- Command Controls -->
+    <div>
+        <h3>Command Stream</h3>
+        <textarea id="commandLog" rows="10" cols="50" readonly></textarea><br>
+        <input type="text" id="commandInput" placeholder="Enter command">
+        <button id="sendCommand">Send Command</button>
+    </div>
+
+    <script>
+
+
+        const localUsername = Math.random().toString(36).substring(2, 9); // Random username
+        const roomName = "123"; // Hardcoded room name
+        const header = document.getElementById("myroom");
+        header.innerHTML += localUsername;
+        const socket = io({ transports: ["websocket"], autoConnect: false }); // Replace with your WebSocket URL
+        socket.on("connect", () => {
+            console.log("Connected to the server");
+            //   connectionStatus.textContent = `Status: Connected (ID: ${socket.id})`;
+        });
+
+        // Handle disconnection
+        socket.on("disconnect", (reason) => {
+            console.log("Disconnected from server:", reason);
+            //    connectionStatus.textContent = `Status: Disconnected (${reason})`;
+        });
+
+        // Handle connection errors
+        socket.on("connect_error", (error) => {
+            console.error("Connection error:", error);
+            //    connectionStatus.textContent = `Status: Connection Error (${error.message})`;
+        });
+
+        // WebSocket event handlers
+        socket.on("ready", () => {
+            initializePeerConnection();
+            createOffer();
+        });
+
+        socket.on("data", (data) => {
+            // const parsedData = JSON.parse(data);
+            console.log(" ---- " + data.type)
+            handleSignalingData(data);
+        });
+
+
+
+        let pc; // RTCPeerConnection instance
+        let commandChannel; // DataChannel for commands
+        let localStream; // Local media stream
+
+        const localVideo = document.getElementById("localVideo");
+        const remoteVideo = document.getElementById("remoteVideo");
+        const commandLog = document.getElementById("commandLog");
+        const commandInput = document.getElementById("commandInput");
+        const sendCommandButton = document.getElementById("sendCommand");
+
+        // Function to log commands
+        const logCommand = (message) => {
+            commandLog.value += message + "\n";
+        };
+
+        // Function to send command
+        sendCommandButton.addEventListener("click", () => {
+            const command = commandInput.value.trim();
+            if (command && commandChannel && commandChannel.readyState === "open") {
+                commandChannel.send(command);
+                logCommand(`Sent: ${command}`);
+                commandInput.value = "";
+            }
+        });
+
+        // Function to start the connection
+        const startConnection = () => {
+
+            console.log("start command");
+            navigator.mediaDevices
+                .getUserMedia({ video: true, audio: false })
+                .then((stream) => {
+                    localStream = stream;
+                    localVideo.srcObject = stream;
+
+                    socket.connect();
+                    socket.emit("join", { username: localUsername, room: roomName });
+                })
+                .catch((error) => {
+                    console.error("Error accessing media devices:", error);
+                });
+        };
+
+        // Function to initialize PeerConnection
+        const initializePeerConnection = () => {
+            pc = new RTCPeerConnection({
+                iceServers: [
+                    { urls: "stun:openrelay.metered.ca:80" },
+                    {
+                        urls: "turn:openrelay.mextered.ca:443",
+                        username: "openrelayproject",
+                        credential: "openrelayproject",
+                    },
+                ],
+            });
+
+            // Add local tracks to PeerConnection
+            localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+            // Handle remote stream
+            pc.ontrack = (event) => {
+                console.log("onTrack --------------")
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            // Handle ICE candidates
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    socket.emit("data", {
+                        username: localUsername,
+                        room: roomName,
+                        data: { type: "candidate", candidate: event.candidate },
+                    });
+                }
+            };
+
+            // Create DataChannel for commands
+            commandChannel = pc.createDataChannel("commands");
+            commandChannel.onopen = () => logCommand("Command channel opened");
+            commandChannel.onclose = () => logCommand("Command channel closed");
+            commandChannel.onmessage = (event) => logCommand(`Received: ${event.data}`);
+        };
+
+        // Function to handle signaling data
+        const handleSignalingData = (data) => {
+
+            if (data.type === "offer") {
+                pc.setRemoteDescription(new RTCSessionDescription(data));
+                pc.createAnswer()
+                    .then((answer) => {
+                        pc.setLocalDescription(answer);
+                        socket.emit("data", {
+                            username: localUsername,
+                            room: roomName,
+                            data: answer,
+                        });
+                    })
+                    .catch((error) => console.error("Error creating answer:", error));
+            } else if (data.type === "answer") {
+                pc.setRemoteDescription(new RTCSessionDescription(data));
+            } else if (data.type === "candidate") {
+                pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        };
+
+        // Function to create an offer
+        const createOffer = () => {
+            pc.createOffer()
+                .then((offer) => {
+                    pc.setLocalDescription(offer);
+                    socket.emit("data", {
+                        username: localUsername,
+                        room: roomName,
+                        data: offer,
+                    });
+                })
+                .catch((error) => console.error("Error creating offer:", error));
+        };
+
+
+        // Start connection on page load
+        window.onload = startConnection;
+
+    </script>
+</body>
+
+</html>
