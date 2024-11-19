@@ -66,12 +66,13 @@
             if (false == peerReady) {
                 peerReady = true
                 socket.emit("ready", { username: localUsername, room: roomName });
-
+                console.log("on ready ,initializePeerConnection ")
                 initializePeerConnection();
-                createOffer();
             }
-            //
+
+            //createOffer();
         });
+
         socket.on("data", (data) => {
             //const parsedData = JSON.parse(atob(data));
             //console.log(" onData " + parsedData.type)
@@ -166,6 +167,7 @@
 
         // Function to handle signaling data
         const handleSignalingData = (data) => {
+            console.log("ME data:", data)
             while (true) {
                 if (data.type === "offer") {
                     pc.setRemoteDescription(new RTCSessionDescription(data));
@@ -181,14 +183,40 @@
                     break
                 }
                 if (data.type === "answer") {
-                    pc.setRemoteDescription(new RTCSessionDescription(data));
-                    break
+
                 }
-                if (data.type === "candidate") {
-                    pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                    break
-                }
+
                 break
+            }
+
+
+            try {
+                if (data.type === "offer") {
+
+                    var rmSDB =
+                        console.log("offer --> ", data)
+                    try {
+
+
+                    }
+                    catch (e) {
+                        console.log("error offer --> ", e.toString)
+                    }
+
+
+                    //     .catch((error) => console.error("Error creating answer:", error));
+                }
+
+
+                // else if (data.type === "answer") {
+                //     pc.setRemoteDescription(new RTCSessionDescription(data));
+                // } else if (data.type === "candidate") {
+                //     pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                // }
+
+            }
+            catch (e) {
+                console.log(e.toString())
             }
 
         };

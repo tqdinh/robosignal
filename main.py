@@ -2,6 +2,7 @@ import ssl
 from flask import Flask, request, render_template
 from flask_socketio import SocketIO, emit, join_room
 import json
+import base64
 
 app = Flask(__name__)
 app.secret_key = "random secret key!"
@@ -17,12 +18,24 @@ def join(message):
     emit("ready", {username: username}, to=room, skip_sid=request.sid)
 
 
+@socketio.on("ready")
+def ready(message):
+    username = message["username"]
+    room = message["room"]
+    print("RoomReady: {} has joined the room {}\n".format(username, room))
+    emit("ready", {username: username}, to=room, skip_sid=request.sid)
+
+
 @socketio.on("data")
 def transfer_data(message):
     username = message["username"]
     room = message["room"]
     data = message["data"]
-    print("DataEvent: {} has sent the data:\n {}\n".format(username, data))
+    print(
+        "DataEvent: {} has sent  {} the data:\n {}\n".format(username, type(data), data)
+    )
+    jsonData = json.dumps(data)
+    base64Encoded = base64.b64encode(jsonData.encode("utf-8")).decode("utf-8")
     emit("data", data, to=room, skip_sid=request.sid)
 
 
@@ -35,6 +48,11 @@ def default_error_handler(e):
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/me")
+def index1():
+    return render_template("index1.html")
 
 
 def startapp():
