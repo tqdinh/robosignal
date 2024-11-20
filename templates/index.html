@@ -88,6 +88,14 @@
         const remoteVideo = document.getElementById("remoteVideo");
         const commandLog = document.getElementById("commandLog");
         const commandInput = document.getElementById("commandInput");
+        commandInput.addEventListener("keypress", function (event) {
+            if (event.key === "Enter") {
+
+                event.preventDefault();
+
+                document.getElementById("sendCommand").click();
+            }
+        })
         const sendCommandButton = document.getElementById("sendCommand");
 
         // Function to log commands
@@ -97,11 +105,24 @@
 
         // Function to send command
         sendCommandButton.addEventListener("click", () => {
-            const command = commandInput.value.trim();
-            if (command && commandChannel && commandChannel.readyState === "open") {
-                commandChannel.send(command);
-                logCommand(`Sent: ${command}`);
-                commandInput.value = "";
+            const message = commandInput.value.trim();
+            if (!commandChannel || commandChannel.readyState !== 'open') {
+                alert('data channel is undefined or is not connected')
+                return;
+            }
+
+            console.log('sending message', message);
+            const data = {
+                message,
+                time: new Date()
+            };
+            try {
+                commandChannel.send(JSON.stringify(data));
+                commandInput.value = ""
+
+            }
+            catch (error) {
+                console.log("send " + error)
             }
         });
 
@@ -137,6 +158,25 @@
                 ],
             });
 
+
+
+            commandChannel = pc.createDataChannel("commands", { ordered: true, maxRetransmits: 10 });
+
+            pc.ondatachannel = (event) => {
+                console.log('peerConnection::ondatachannel');
+                channel = event.channel
+
+                channel.onopen = () => console.log('dataChannel opened');
+                channel.onclose = () => console.log('dataChannel closed');
+                channel.onerror = (error) => console.error('dataChannel error:', error);
+
+                channel.onmessage = ({ data }) => {
+                    commandLog.value = data
+                    console.log('dataChannel data', data);
+                };
+            }
+
+
             // Add local tracks to PeerConnection
             localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
@@ -158,10 +198,7 @@
             };
 
             // Create DataChannel for commands
-            commandChannel = pc.createDataChannel("commands");
-            commandChannel.onopen = () => logCommand("Command channel opened");
-            commandChannel.onclose = () => logCommand("Command channel closed");
-            commandChannel.onmessage = (event) => logCommand(`Received: ${event.data}`);
+            // commandChannel.onmessage = (event) => logCommand(`Received: ${event.data}`);
         };
 
         // Function to handle signaling data
