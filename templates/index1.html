@@ -96,7 +96,7 @@
 
         let pc; // RTCPeerConnection instance
         let commandChannel; // DataChannel for commands
-        let localStream; // Local media stream
+        let localStream = null; // Local media stream
 
         const localVideo = document.getElementById("localVideo");
         const remoteVideo = document.getElementById("remoteVideo");
@@ -143,14 +143,17 @@
         const startConnection = () => {
 
             console.log("start command");
+
+            socket.connect();
+            socket.emit("join", { username: localUsername, room: roomName });
+
             navigator.mediaDevices
                 .getUserMedia({ video: true, audio: false })
                 .then((stream) => {
                     localStream = stream;
                     localVideo.srcObject = stream;
 
-                    socket.connect();
-                    socket.emit("join", { username: localUsername, room: roomName });
+
                 })
                 .catch((error) => {
                     console.error("Error accessing media devices:", error);
@@ -171,7 +174,8 @@
             });
 
             // Add local tracks to PeerConnection
-            localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+            // if (null != localStream)
+            localStream?.getTracks().forEach((track) => pc.addTrack(track, localStream));
 
             // Handle remote stream
             pc.ontrack = (event) => {
